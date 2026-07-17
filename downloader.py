@@ -114,7 +114,7 @@ def _download_segment(
         "download_ranges": download_range_func(None, [(start, end)]),
         "force_keyframes_at_cuts": True,
         "cookiefile": _find_cookies(),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["tv", "web", "android"]}},
         **ext_args,
     }
     # Remove None values
@@ -393,7 +393,7 @@ def process_audio(
         "quiet": True,
         "no_warnings": True,
         "cookiefile": _find_cookies(),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["tv", "web", "android"]}},
     }
     opts = {k: v for k, v in opts.items() if v is not None}
 

@@ -199,7 +199,7 @@ def _fetch_info(url: str) -> dict:
         "quiet": True,
         "no_warnings": True,
         "cookiefile": _find_cookies(),
-        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "extractor_args": {"youtube": {"player_client": ["tv", "web", "android"]}},
     }
     opts = {k: v for k, v in opts.items() if v is not None}
     with yt_dlp.YoutubeDL(opts) as ydl:
