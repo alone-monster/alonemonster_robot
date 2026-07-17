@@ -200,6 +200,7 @@ def _fetch_info(url: str) -> dict:
         "no_warnings": False,
         "verbose": True,
         "cookiefile": _find_cookies(),
+        "js_runtimes": {"node": {}},
         "extractor_args": {"youtube": {
             "player_client": ["tv", "web"],
             "formats": ["missing_pot"],
