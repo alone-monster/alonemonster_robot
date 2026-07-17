@@ -1,6 +1,7 @@
 pyTelegramBotAPI>=4.14.0
 yt-dlp>=2024.1.1
 mega.py>=1.0.8
+tenacity>=8.0.0
 python-dateutil>=2.8.2
 psutil>=5.9.0
 fastapi>=0.110.0
