@@ -238,11 +238,18 @@ def _send_metadata_message(
 
     vid_res_dict: dict[str, dict] = {}
     for f in info.get("formats", []):
+        # Only mp4 video-only streams
         if f.get("ext") != "mp4":
+            continue
+        if f.get("vcodec") in (None, "none"):
+            continue
+        height = f.get("height")
+        if not height:
             continue
         note = f.get("format_note", "") or ""
         for res in RESOLUTIONS:
-            if note.startswith(res):
+            res_h = int(res[:-1])  # "1080p" → 1080
+            if height == res_h or note.startswith(res):
                 if res not in vid_res_dict:
                     vid_res_dict[res] = f
                 break
@@ -293,10 +300,10 @@ def _send_metadata_message(
     available_vid_btns = []
     for res in RESOLUTIONS:
         if res in vid_res_dict:
-            f_id = vid_res_dict[res].get("format_id", "bestvideo")
+            height = vid_res_dict[res].get("height") or int(res[:-1])
             available_vid_btns.append(
                 types.InlineKeyboardButton(
-                    text=RES_LABELS[res], callback_data=f"vid_{f_id}"
+                    text=RES_LABELS[res], callback_data=f"vid_{height}"
                 )
             )
     for i in range(0, len(available_vid_btns), 3):

@@ -93,8 +93,13 @@ def _download_segment(
             "postprocessors": [],
         }
     else:
-        # Video-only stream; audio is handled separately
-        fmt = f"{format_id}/bestvideo"
+        # format_id is now a height string e.g. "1080"
+        # Use flexible height-based selector so YouTube CDN quirks don't break it
+        h = int(format_id) if format_id.isdigit() else 1080
+        fmt = (
+            f"bestvideo[height<={h}][ext=mp4]"
+            f"/bestvideo[ext=mp4]"
+        )
         ext_args = {}
 
     opts: dict = {
@@ -122,14 +127,25 @@ def _calculate_chunks(
     Divide the video into approximately TARGET_CHUNK_BYTES segments.
 
     Returns a list of (start_sec, end_sec, approx_bytes) tuples.
+    format_id is now a height string e.g. "1080".
     """
     duration: float = float(info.get("duration") or 0)
     if duration <= 0:
         raise ValueError("Video duration is unknown; cannot chunk.")
 
-    # Find the selected format's filesize
+    # Find the best video-only format at or below the requested height
+    h = int(format_id) if format_id.isdigit() else 1080
     vid_format = next(
-        (f for f in info.get("formats", []) if f.get("format_id") == format_id),
+        (
+            f for f in sorted(
+                info.get("formats", []),
+                key=lambda f: f.get("height") or 0,
+                reverse=True,
+            )
+            if (f.get("height") or 0) <= h
+            and f.get("vcodec") not in (None, "none")
+            and f.get("acodec") in (None, "none")  # video-only
+        ),
         None,
     )
     vid_size = (
@@ -180,9 +196,20 @@ def _best_audio_format(info: dict) -> dict | None:
 
 
 def _total_video_size(info: dict, format_id: str) -> int:
-    """Approximate total output file size (video + audio)."""
+    """Approximate total output file size (video + audio).
+    format_id is a height string e.g. '1080'."""
+    h = int(format_id) if format_id.isdigit() else 1080
     vid = next(
-        (f for f in info.get("formats", []) if f.get("format_id") == format_id),
+        (
+            f for f in sorted(
+                info.get("formats", []),
+                key=lambda f: f.get("height") or 0,
+                reverse=True,
+            )
+            if (f.get("height") or 0) <= h
+            and f.get("vcodec") not in (None, "none")
+            and f.get("acodec") in (None, "none")  # video-only
+        ),
         None,
     )
     aud = _best_audio_format(info)
