@@ -13,6 +13,14 @@ import os
 import threading
 from pathlib import Path
 
+# --- Compatibility shim: Python 3.11 removed asyncio.coroutine, but the
+# `mega.py` package's pinned `tenacity` dependency still references it. ---
+import asyncio
+if not hasattr(asyncio, "coroutine"):
+    def _coroutine_shim(func):
+        return func
+    asyncio.coroutine = _coroutine_shim
+
 from mega import Mega
 
 logger = logging.getLogger(__name__)
