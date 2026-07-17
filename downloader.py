@@ -95,10 +95,14 @@ def _download_segment(
     else:
         # format_id is now a height string e.g. "1080"
         # Use flexible height-based selector so YouTube CDN quirks don't break it
+        # Try mp4 first for direct copy; fall back to any format (webm/vp9)
+        # FFmpeg will re-encode non-h264 to h264 so output is always valid mp4
         h = int(format_id) if format_id.isdigit() else 1080
         fmt = (
             f"bestvideo[height<={h}][ext=mp4]"
+            f"/bestvideo[height<={h}]"
             f"/bestvideo[ext=mp4]"
+            f"/bestvideo"
         )
         ext_args = {}
 
@@ -282,10 +286,16 @@ def process_video(
             # --- Merge video + audio ---
             progress_cb("Merging video + audio", idx, n_chunks, 60.0, 0, total_size)
             merged_path = work_dir / f"chunk_{idx:04d}_merged.mp4"
+            # If video is webm/vp9/av1 we must re-encode to h264 for valid mp4
+            # If it's already mp4/h264 we can stream-copy (faster)
+            vid_ext = vid_file.suffix.lower()
+            vcodec_args = ["-c:v", "copy"] if vid_ext == ".mp4" else [
+                "-c:v", "libx264", "-preset", "fast", "-crf", "23"
+            ]
             _run_ffmpeg(
                 "-i", str(vid_file),
                 "-i", str(aud_file),
-                "-c:v", "copy",
+                *vcodec_args,
                 "-c:a", "aac",
                 "-strict", "experimental",
                 str(merged_path),

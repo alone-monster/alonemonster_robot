@@ -238,11 +238,11 @@ def _send_metadata_message(
 
     vid_res_dict: dict[str, dict] = {}
     for f in info.get("formats", []):
-        # Only mp4 video-only streams
-        if f.get("ext") != "mp4":
-            continue
+        # Video-only streams only (any ext — we convert to mp4 via FFmpeg)
         if f.get("vcodec") in (None, "none"):
             continue
+        if f.get("acodec") not in (None, "none"):
+            continue  # skip muxed (video+audio) formats
         height = f.get("height")
         if not height:
             continue
