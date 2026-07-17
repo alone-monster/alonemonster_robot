@@ -200,8 +200,7 @@ def _fetch_info(url: str) -> dict:
         "no_warnings": True,
         "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {
-            "player_client": ["tv", "web", "android"],
-            "formats": ["missing_pot"],
+            "player_client": ["android", "mweb", "tv"],
         }},
     }
     opts = {k: v for k, v in opts.items() if v is not None}
