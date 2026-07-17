@@ -260,7 +260,7 @@ def _send_metadata_message(
                 break
 
     vid_text_lines = []
-    for i, res in enumerate(r for r in RESOLUTIONS if r in vid_res_dict), 1:
+    for i, res in enumerate((r for r in RESOLUTIONS if r in vid_res_dict), 1):
         f = vid_res_dict[res]
         size = f.get("filesize") or f.get("filesize_approx")
         size_str = format_size(size) if size else "N/A"
