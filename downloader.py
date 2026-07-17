@@ -115,7 +115,8 @@ def _download_segment(
         "force_keyframes_at_cuts": True,
         "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {
-            "player_client": ["android", "mweb", "tv"],
+            "player_client": ["tv", "web"],
+            "formats": ["missing_pot"],
         }},
         **ext_args,
     }
@@ -396,7 +397,8 @@ def process_audio(
         "no_warnings": True,
         "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {
-            "player_client": ["android", "mweb", "tv"],
+            "player_client": ["tv", "web"],
+            "formats": ["missing_pot"],
         }},
     }
     opts = {k: v for k, v in opts.items() if v is not None}

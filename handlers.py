@@ -196,11 +196,13 @@ def _fetch_info(url: str) -> dict:
 
     opts = {
         "skip_download": True,
-        "quiet": True,
-        "no_warnings": True,
+        "quiet": False,
+        "no_warnings": False,
+        "verbose": True,
         "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {
-            "player_client": ["android", "mweb", "tv"],
+            "player_client": ["tv", "web"],
+            "formats": ["missing_pot"],
         }},
     }
     opts = {k: v for k, v in opts.items() if v is not None}
