@@ -114,6 +114,7 @@ def _download_segment(
         "download_ranges": download_range_func(None, [(start, end)]),
         "force_keyframes_at_cuts": True,
         "cookiefile": _find_cookies(),
+        "js_runtimes": {"node": {}},
         "extractor_args": {"youtube": {
             "player_client": ["tv", "web"],
             "formats": ["missing_pot"],
@@ -396,6 +397,7 @@ def process_audio(
         "quiet": True,
         "no_warnings": True,
         "cookiefile": _find_cookies(),
+        "js_runtimes": {"node": {}},
         "extractor_args": {"youtube": {
             "player_client": ["tv", "web"],
             "formats": ["missing_pot"],
