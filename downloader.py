@@ -36,6 +36,27 @@ logger = logging.getLogger(__name__)
 TARGET_CHUNK_BYTES = 7 * 1024 * 1024
 
 
+def _find_cookies() -> str | None:
+    """
+    Search for cookies.txt in common locations:
+      1. Same directory as this script (telegram-bot/)
+      2. Parent directory (repo root, for when Render root dir = telegram-bot/)
+      3. Current working directory
+    Returns the absolute path string, or None if not found.
+    """
+    candidates = [
+        Path(__file__).parent / "cookies.txt",
+        Path(__file__).parent.parent / "cookies.txt",
+        Path("cookies.txt").resolve(),
+    ]
+    for p in candidates:
+        if p.exists():
+            logger.info("Using cookies from: %s", p)
+            return str(p)
+    logger.warning("cookies.txt not found — proceeding without cookies")
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Progress callback type:
 #   progress_cb(stage, chunk_idx, total_chunks, chunk_pct,
@@ -83,7 +104,7 @@ def _download_segment(
         "no_warnings": True,
         "download_ranges": download_range_func(None, [(start, end)]),
         "force_keyframes_at_cuts": True,
-        "cookiefile": "cookies.txt" if Path("cookies.txt").exists() else None,
+        "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         **ext_args,
     }
@@ -334,7 +355,7 @@ def process_audio(
         "outtmpl": str(work_dir / f"{_safe_filename(title)}.%(ext)s"),
         "quiet": True,
         "no_warnings": True,
-        "cookiefile": "cookies.txt" if Path("cookies.txt").exists() else None,
+        "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     opts = {k: v for k, v in opts.items() if v is not None}

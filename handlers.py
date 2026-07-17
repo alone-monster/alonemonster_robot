@@ -176,6 +176,21 @@ def register_handlers(bot: telebot.TeleBot) -> None:
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+def _find_cookies() -> str | None:
+    """Search for cookies.txt in the script dir, repo root, and CWD."""
+    candidates = [
+        Path(__file__).parent / "cookies.txt",
+        Path(__file__).parent.parent / "cookies.txt",
+        Path("cookies.txt").resolve(),
+    ]
+    for p in candidates:
+        if p.exists():
+            logger.info("Using cookies from: %s", p)
+            return str(p)
+    logger.warning("cookies.txt not found — proceeding without cookies")
+    return None
+
+
 def _fetch_info(url: str) -> dict:
     import yt_dlp
 
@@ -183,7 +198,7 @@ def _fetch_info(url: str) -> dict:
         "skip_download": True,
         "quiet": True,
         "no_warnings": True,
-        "cookiefile": "cookies.txt" if Path("cookies.txt").exists() else None,
+        "cookiefile": _find_cookies(),
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
     opts = {k: v for k, v in opts.items() if v is not None}
