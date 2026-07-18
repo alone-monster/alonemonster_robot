@@ -3,3 +3,4 @@ yt-dlp[default]
 python-dateutil>=2.8.2
 fastapi>=0.110.0
 uvicorn>=0.27.0
+bgutil-ytdlp-pot-provider
