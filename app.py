@@ -20,17 +20,15 @@ Deployment notes (Render):
         python-dateutil>=2.8.2
         fastapi>=0.110.0
         uvicorn>=0.27.0
+        bgutil-ytdlp-pot-provider   # Python plugin — talks to the pot-provider service below
   - packages.txt: ffmpeg   (already pre-installed on Render, kept for safety)
-  - NOTE on PO tokens: cookies.txt makes yt-dlp SKIP the "ios"/"android"
-    clients ("does not support cookies"), leaving only "tv"/"web" — and
-    those increasingly require a PO token. This app now tries WITHOUT
-    cookies first (ios/android/tv, no PO token needed) and only falls
-    back to cookies for videos that actually need login. If you still
-    see "missing_pot" 403s on the fallback path, you'd need to run the
-    bgutil-ytdlp-pot-provider's Node/Deno SERVER (not just `pip install`
-    the package — the pip package alone has no token backend running,
-    which is why the logs showed "Script path doesn't exist"). See:
-    https://github.com/Brainicism/bgutil-ytdlp-pot-provider
+  - PO Token provider (separate Render service, already deployed as "pot-provider"
+    using the official brainicism/bgutil-ytdlp-pot-provider Docker image):
+        POT_PROVIDER_URL = https://pot-provider-j0ju.onrender.com
+    Set this as an env var on THIS (the bot) service, not the provider service.
+    NOTE (from the official repo): PO tokens no longer bypass YouTube's bot
+    check in every case — this helps with "missing_pot" 403s specifically,
+    it is not a guaranteed fix for "Sign in to confirm you're not a bot".
   - Build Command:
         pip install -r requirements.txt && mkdir -p $HOME/nodejs && \
         curl -fsSL https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz \
@@ -67,6 +65,11 @@ from telebot import types
 # --------------------------------------------------------------------------
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
+
+# URL of the separately-deployed bgutil-ytdlp-pot-provider Render service.
+# Set this env var to your provider's public URL, e.g.
+#   POT_PROVIDER_URL = https://pot-provider-j0ju.onrender.com
+POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "http://127.0.0.1:4416")
 
 BASE_DIR = Path(__file__).resolve().parent
 COOKIES_FILE = BASE_DIR / "cookies.txt"
@@ -114,11 +117,9 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
     stale/expired and causes its own failure.
 
     NOTE: even with cookies, tv/web can still hit "missing_pot" 403s on
-    some formats/videos. That is a separate, deeper issue — it means
-    YouTube wants a valid PO token, and the only real fix is running the
-    bgutil-ytdlp-pot-provider's actual Node/Deno SERVER (not just
-    `pip install`-ing the package): https://github.com/Brainicism/bgutil-ytdlp-pot-provider
-    Client-order tricks alone can't fully substitute for that.
+    some formats/videos. That's now handled by a real PO token provider
+    (bgutil-ytdlp-pot-provider) deployed as its own Render service — see
+    POT_PROVIDER_URL below.
     """
     if use_cookies:
         player_client = ["tv", "web"]
@@ -127,7 +128,10 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
 
     opts = {
         "js_runtimes": {"node": {}},
-        "extractor_args": {"youtube": {"player_client": player_client}},
+        "extractor_args": {
+            "youtube": {"player_client": player_client},
+            "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
+        },
         "retries": 10,
         "fragment_retries": 10,
         "socket_timeout": 30,
