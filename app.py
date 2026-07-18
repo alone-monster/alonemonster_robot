@@ -100,22 +100,25 @@ _last_edit_time = {}   # chat_id -> float (throttle progress edits)
 # --------------------------------------------------------------------------
 
 
-def _base_ydl_opts(use_cookies: bool = False) -> dict:
+def _base_ydl_opts(use_cookies: bool = True) -> dict:
     """
     Options shared by every yt-dlp call (metadata + downloads).
 
-    IMPORTANT: passing a cookiefile makes yt-dlp SKIP the "ios" and
-    "android" player clients entirely ("does not support cookies") —
-    that's confirmed in the logs. ios/android are exactly the clients
-    that don't need a PO token for videoplayback URLs, so cookies were
-    accidentally forcing every request onto "tv"/"web", which DO need a
-    PO token — and with no PO token provider actually running (see
-    below), those URLs 403 immediately.
+    Render's IPs are cloud/datacenter ranges that YouTube bot-detects
+    aggressively. Confirmed by logs: going cookie-less to unlock the
+    ios/android clients (which skip PO-token checks) backfired here —
+    YouTube immediately returned "Sign in to confirm you're not a bot"
+    for this Render IP. So cookies are the DEFAULT now (tv/web clients,
+    since ios/android refuse to run alongside a cookiefile). Cookie-less
+    (ios/android/tv) is only tried as a fallback, in case cookies.txt is
+    stale/expired and causes its own failure.
 
-    So: try WITHOUT cookies first (ios/android/tv — no PO token needed).
-    Only fall back to cookies (tv/web) for videos that truly need login
-    (age-restricted / private) — see _extract_info_with_fallback and
-    _download_with_fallback.
+    NOTE: even with cookies, tv/web can still hit "missing_pot" 403s on
+    some formats/videos. That is a separate, deeper issue — it means
+    YouTube wants a valid PO token, and the only real fix is running the
+    bgutil-ytdlp-pot-provider's actual Node/Deno SERVER (not just
+    `pip install`-ing the package): https://github.com/Brainicism/bgutil-ytdlp-pot-provider
+    Client-order tricks alone can't fully substitute for that.
     """
     if use_cookies:
         player_client = ["tv", "web"]
@@ -138,28 +141,26 @@ def _base_ydl_opts(use_cookies: bool = False) -> dict:
 
 
 def _extract_info_with_fallback(url: str) -> dict:
-    """Metadata fetch: try cookie-less (ios/android/tv) first, then cookies."""
+    """Metadata fetch: cookies first (avoids Render-IP bot-check), then cookie-less."""
     try:
-        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), "skip_download": True}) as ydl:
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), "skip_download": True}) as ydl:
             return ydl.extract_info(url, download=False)
     except Exception as first_err:
-        if not COOKIES_FILE.exists():
-            raise
-        logger.warning("Cookie-less metadata fetch failed (%s), retrying with cookies", first_err)
-        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), "skip_download": True}) as ydl:
+        logger.warning("Cookie-based metadata fetch failed (%s), retrying cookie-less", first_err)
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), "skip_download": True}) as ydl:
             return ydl.extract_info(url, download=False)
 
 
 def _download_with_fallback(url: str, opts_overrides: dict):
-    """Download: try cookie-less (ios/android/tv) first, then cookies."""
+    """Download: cookies first (avoids Render-IP bot-check), then cookie-less."""
     try:
-        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), **opts_overrides}) as ydl:
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), **opts_overrides}) as ydl:
             ydl.download([url])
     except Exception as first_err:
-        if not COOKIES_FILE.exists() or "Cancelled" in str(first_err):
+        if "Cancelled" in str(first_err):
             raise
-        logger.warning("Cookie-less download failed (%s), retrying with cookies", first_err)
-        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), **opts_overrides}) as ydl:
+        logger.warning("Cookie-based download failed (%s), retrying cookie-less", first_err)
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), **opts_overrides}) as ydl:
             ydl.download([url])
 
 
