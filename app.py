@@ -98,7 +98,6 @@ def _base_ydl_opts() -> dict:
         "extractor_args": {
             "youtube": {
                 "player_client": ["tv", "web"],
-                "formats": ["missing_pot"],
             }
         },
         "quiet": False,
