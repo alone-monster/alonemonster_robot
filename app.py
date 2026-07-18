@@ -40,6 +40,7 @@ import logging
 import math
 import os
 import re
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -50,7 +51,6 @@ import yt_dlp
 from dateutil import parser as date_parser
 from fastapi import FastAPI
 from telebot import types
-from yt_dlp.utils import download_range_func
 
 # --------------------------------------------------------------------------
 # Config
@@ -334,48 +334,40 @@ def handle_youtube_link(message):
 # --------------------------------------------------------------------------
 
 
-def _estimate_chunk_seconds(duration, video_fmt=None, audio_fmt=None):
-    """Rough time-slice length so each resulting chunk lands near CHUNK_TARGET_MB."""
-    duration = duration or 0
-    if duration <= 0:
-        return None  # can't slice an unknown-length stream; download whole thing
-
-    video_bps = 0
-    if video_fmt:
-        vbytes = video_fmt.get("filesize") or video_fmt.get("filesize_approx")
-        if vbytes:
-            video_bps = vbytes / duration
-        else:
-            tbr = video_fmt.get("tbr") or 1000  # kbps guess
-            video_bps = (tbr * 1000) / 8
-
-    audio_bps = 0
-    if audio_fmt:
-        abytes = audio_fmt.get("filesize") or audio_fmt.get("filesize_approx")
-        if abytes:
-            audio_bps = abytes / duration
-        else:
-            abr = audio_fmt.get("abr") or DEFAULT_AUDIO_KBPS_ESTIMATE
-            audio_bps = (abr * 1000) / 8
-    elif video_fmt:
-        # video downloads always pull +bestaudio too
-        audio_bps = (DEFAULT_AUDIO_KBPS_ESTIMATE * 1000) / 8
-
-    total_bps = video_bps + audio_bps
-    if total_bps <= 0:
-        return duration
-
-    chunk_seconds = CHUNK_TARGET_BYTES / total_bps
-    chunk_seconds = max(MIN_CHUNK_SECONDS, chunk_seconds)
-    return min(chunk_seconds, duration)
+def _split_local_file(input_path: Path, chunk_seconds: float, out_prefix: Path) -> list:
+    """
+    Split an already-downloaded local file into time-sliced parts using a
+    LOCAL ffmpeg call (stream-copy, no re-encode, no network involved).
+    This avoids YouTube's 403 blocks that happen when ffmpeg tries to fetch
+    ranges directly from googlevideo.com.
+    """
+    ext = input_path.suffix
+    parts = []
+    i = 0
+    while True:
+        start = i * chunk_seconds
+        out_path = Path(f"{out_prefix}_part{i + 1:03d}{ext}")
+        cmd = [
+            "ffmpeg", "-y", "-ss", str(start), "-i", str(input_path),
+            "-t", str(chunk_seconds), "-c", "copy", "-avoid_negative_ts", "make_zero",
+            str(out_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0 or not out_path.exists() or out_path.stat().st_size == 0:
+            if out_path.exists():
+                out_path.unlink(missing_ok=True)
+            break
+        parts.append(out_path)
+        i += 1
+    return parts if parts else [input_path]
 
 
 # --------------------------------------------------------------------------
-# Progress bar (shared by video & audio downloads)
+# Progress bar (for the single full download)
 # --------------------------------------------------------------------------
 
 
-def _make_progress_hook(chat_id, message_id, base_caption, chunk_index, total_chunks):
+def _make_progress_hook(chat_id, message_id, base_caption):
     def hook(d):
         if d["status"] != "downloading":
             return
@@ -387,20 +379,18 @@ def _make_progress_hook(chat_id, message_id, base_caption, chunk_index, total_ch
         if total_bytes <= 0:
             return
 
-        chunk_percent = (done_bytes / total_bytes) * 100
-        overall_percent = ((chunk_index - 1) + chunk_percent / 100) / total_chunks * 100
-
-        filled = int(chunk_percent // 10)
+        percent = (done_bytes / total_bytes) * 100
+        filled = int(percent // 10)
         bar = "■" * filled + "□" * (10 - filled)
         done_str = size_format(done_bytes)
         total_str = size_format(total_bytes)
 
         now = time.time()
-        if chunk_percent == 0 or int(chunk_percent) == 100 or now - _last_edit_time.get(chat_id, 0) >= 3:
+        if percent == 0 or int(percent) == 100 or now - _last_edit_time.get(chat_id, 0) >= 3:
             new_caption = (
                 f"{base_caption}\n\n"
-                f"◉ Downloading Part {chunk_index}/{total_chunks}...\n"
-                f"[{bar}] {int(chunk_percent)}% [{done_str}/{total_str}]  ·  Overall: {int(overall_percent)}%"
+                f"◉ Downloading...\n"
+                f"[{bar}] {int(percent)}% [{done_str}/{total_str}]"
             )
             cancel_key = types.InlineKeyboardButton(text="Cancel", callback_data="cncl_btn")
             board = types.InlineKeyboardMarkup()
@@ -418,7 +408,7 @@ def _make_progress_hook(chat_id, message_id, base_caption, chunk_index, total_ch
 
 
 # --------------------------------------------------------------------------
-# Core: chunked download + immediate Telegram send
+# Core: full download (reliable) → local split into 40MB parts → send
 # --------------------------------------------------------------------------
 
 
@@ -426,72 +416,78 @@ def _download_and_send(chat_id, message_id, url, base_caption, ydl_format, title
                         duration, video_fmt, audio_fmt, kind):
     """
     kind: 'video' or 'audio'
-    Downloads in time-sliced chunks, sends each straight to Telegram, deletes
-    it, then moves to the next slice — the full file never sits on disk.
+    Downloads the file normally (reliable, same as before), then splits it
+    LOCALLY (no network) into ~38MB parts, sending + deleting each part as
+    it's ready. The full file is deleted the moment splitting is done.
     """
     _cleanup_stale_files()
     session_prefix = f"{safe_filename(title)}_{chat_id}_{int(time.time())}"
+    full_outtmpl = str(WORK_DIR / f"{session_prefix}_full.%(ext)s")
 
-    chunk_seconds = _estimate_chunk_seconds(duration, video_fmt, audio_fmt)
-    if chunk_seconds is None:
-        num_chunks = 1
-        ranges = [(0, None)]
+    opts = {
+        **_base_ydl_opts(),
+        "format": ydl_format,
+        "outtmpl": full_outtmpl,
+        "progress_hooks": [_make_progress_hook(chat_id, message_id, base_caption)],
+    }
+    if kind == "video":
+        opts["merge_output_format"] = "mp4"
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+    except Exception as e:
+        if "Cancelled" not in str(e):
+            bot.send_message(chat_id, f"⚠️ Download failed: {e}")
+        return
+
+    matches = [m for m in glob.glob(str(WORK_DIR / f"{session_prefix}_full.*")) if not m.endswith(".part")]
+    if not matches:
+        bot.send_message(chat_id, "⚠️ Download produced no file.")
+        return
+    full_path = Path(matches[0])
+
+    # Decide whether splitting is even needed, based on the ACTUAL file size.
+    file_size = full_path.stat().st_size
+    if file_size <= CHUNK_TARGET_BYTES or not duration:
+        parts = [full_path]
     else:
-        num_chunks = max(1, math.ceil(duration / chunk_seconds))
-        ranges = []
-        for i in range(num_chunks):
-            start = i * chunk_seconds
-            end = duration if i == num_chunks - 1 else min((i + 1) * chunk_seconds, duration)
-            ranges.append((start, end))
+        num_target_chunks = math.ceil(file_size / CHUNK_TARGET_BYTES)
+        chunk_seconds = max(MIN_CHUNK_SECONDS, duration / num_target_chunks)
+        try:
+            bot.edit_message_caption(
+                chat_id=chat_id, message_id=message_id,
+                caption=f"{base_caption}\n\n✂️ Splitting into parts...", parse_mode="HTML",
+            )
+        except Exception:
+            pass
+        parts = _split_local_file(full_path, chunk_seconds, WORK_DIR / f"{session_prefix}_split")
 
-    for idx, (start, end) in enumerate(ranges, start=1):
+    total_parts = len(parts)
+    for idx, part_path in enumerate(parts, start=1):
         if download_cancel.get(chat_id):
             break
-
-        outtmpl = str(WORK_DIR / f"{session_prefix}_part{idx:03d}.%(ext)s")
-        opts = {
-            **_base_ydl_opts(),
-            "format": ydl_format,
-            "outtmpl": outtmpl,
-            "progress_hooks": [_make_progress_hook(chat_id, message_id, base_caption, idx, num_chunks)],
-        }
-        if kind == "video":
-            opts["merge_output_format"] = "mp4"
-        if end is not None:
-            opts["download_ranges"] = download_range_func(None, [(start, end)])
-            if kind == "video":
-                opts["force_keyframes_at_cuts"] = True
-
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-        except Exception as e:
-            if "Cancelled" in str(e):
-                break
-            bot.send_message(chat_id, f"⚠️ Chunk {idx}/{num_chunks} download failed: {e}")
-            continue
-
-        matches = glob.glob(str(WORK_DIR / f"{session_prefix}_part{idx:03d}.*"))
-        matches = [m for m in matches if not m.endswith(".part")]
-        if not matches:
-            bot.send_message(chat_id, f"⚠️ Chunk {idx}/{num_chunks} produced no file, skipping.")
-            continue
-        chunk_path = matches[0]
-
-        try:
-            with open(chunk_path, "rb") as f:
-                part_label = f" (Part {idx}/{num_chunks})" if num_chunks > 1 else ""
+            with open(part_path, "rb") as f:
+                label = f" (Part {idx}/{total_parts})" if total_parts > 1 else ""
                 if kind == "video":
-                    bot.send_video(chat_id, f, caption=f"{title}{part_label}", supports_streaming=True, timeout=120)
+                    bot.send_video(chat_id, f, caption=f"{title}{label}", supports_streaming=True, timeout=120)
                 else:
-                    bot.send_audio(chat_id, f, caption=f"{title}{part_label}", timeout=120)
+                    bot.send_audio(chat_id, f, caption=f"{title}{label}", timeout=120)
         except Exception as e:
-            bot.send_message(chat_id, f"⚠️ Sending part {idx}/{num_chunks} failed: {e}")
+            bot.send_message(chat_id, f"⚠️ Sending part {idx}/{total_parts} failed: {e}")
         finally:
             try:
-                os.remove(chunk_path)
+                os.remove(part_path)
             except Exception:
                 pass
+
+    # In case the full file wasn't already removed as one of `parts` (e.g. cancelled early)
+    try:
+        if full_path.exists():
+            os.remove(full_path)
+    except Exception:
+        pass
 
     try:
         if download_cancel.get(chat_id):
@@ -503,7 +499,7 @@ def _download_and_send(chat_id, message_id, url, base_caption, ydl_format, title
         else:
             bot.edit_message_caption(
                 chat_id=chat_id, message_id=message_id,
-                caption=f"{base_caption}\n\n✅ Done! Sent {num_chunks} part(s).",
+                caption=f"{base_caption}\n\n✅ Done! Sent {total_parts} part(s).",
                 parse_mode="HTML",
             )
     except Exception:
