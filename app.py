@@ -20,6 +20,7 @@ Deployment notes (Render):
         python-dateutil>=2.8.2
         fastapi>=0.110.0
         uvicorn>=0.27.0
+        bgutil-ytdlp-pot-provider   # PO token provider — fixes "missing_pot" 403s
   - packages.txt: ffmpeg   (already pre-installed on Render, kept for safety)
   - Build Command:
         pip install -r requirements.txt && mkdir -p $HOME/nodejs && \
@@ -97,9 +98,18 @@ def _base_ydl_opts() -> dict:
         "js_runtimes": {"node": {}},
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv", "web"],
+                # tv/ios/android clients don't require a PO token for most
+                # formats; web is kept last as a fallback only. We no longer
+                # force-include "missing_pot" formats — those are formats
+                # YouTube requires a valid PO token for, and without a PO
+                # token provider (see requirements.txt) their signed URLs
+                # 403 immediately, which was the root cause of the crash.
+                "player_client": ["tv", "ios", "android", "web"],
             }
         },
+        "retries": 10,
+        "fragment_retries": 10,
+        "socket_timeout": 30,
         "quiet": False,
         "no_warnings": False,
         "verbose": True,
