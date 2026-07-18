@@ -458,7 +458,8 @@ def _download_and_send(chat_id, message_id, url, base_caption, ydl_format, title
             opts["merge_output_format"] = "mp4"
         if end is not None:
             opts["download_ranges"] = download_range_func(None, [(start, end)])
-            opts["force_keyframes_at_cuts"] = True
+            if kind == "video":
+                opts["force_keyframes_at_cuts"] = True
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -637,7 +638,7 @@ def back_argument(call):
 app = FastAPI()
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok"}
 
