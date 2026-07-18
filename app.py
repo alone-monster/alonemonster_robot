@@ -101,8 +101,9 @@ def _base_ydl_opts() -> dict:
                 "formats": ["missing_pot"],
             }
         },
-        "quiet": True,
-        "no_warnings": True,
+        "quiet": False,
+        "no_warnings": False,
+        "verbose": True,
     }
     return {k: v for k, v in opts.items() if v is not None}
 
