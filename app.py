@@ -156,12 +156,31 @@ def _extract_info_with_fallback(url: str) -> dict:
 
 
 def _download_with_fallback(url: str, opts_overrides: dict):
-    """Download: cookies first (avoids Render-IP bot-check), then cookie-less."""
+    """
+    Download: cookies first (avoids Render-IP bot-check at the extraction
+    stage). We only retry cookie-less if the FIRST attempt failed during
+    extraction/metadata — a stage where cookie-less sometimes still works.
+
+    If cookies got us all the way to a resolved format/URL and the failure
+    happened at the actual byte-fetch stage (yt-dlp's error message contains
+    "unable to download video data"), retrying without cookies will NOT
+    help — cookies are what unlock this video in the first place, so
+    dropping them just trades a possibly-fixable 403 for an unfixable
+    "Sign in to confirm you're not a bot" / LOGIN_REQUIRED. In that case we
+    surface the real error immediately instead of masking it.
+    """
     try:
         with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), **opts_overrides}) as ydl:
             ydl.download([url])
     except Exception as first_err:
         if "Cancelled" in str(first_err):
+            raise
+        if "unable to download video data" in str(first_err):
+            logger.error(
+                "Cookie-based download failed at the byte-fetch stage (%s) — "
+                "not retrying cookie-less, this needs fresh cookies or a PO token fix.",
+                first_err,
+            )
             raise
         logger.warning("Cookie-based download failed (%s), retrying cookie-less", first_err)
         with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), **opts_overrides}) as ydl:
