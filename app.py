@@ -593,7 +593,19 @@ def call_handle(call):
     video_fmt = next(
         (f for f in info.get("formats", []) if f.get("format_id") == format_id), None
     )
-    ydl_format = f"{format_id}+bestaudio/best"
+    # The exact itag chosen at metadata-fetch time can be missing from the
+    # fresh extraction yt-dlp does internally at download time (different
+    # client/session can expose a different format list), which raised
+    # "Requested format is not available". Fall back to a height-matched
+    # selector so a same-resolution format is picked even if the itag differs.
+    height = video_fmt.get("height") if video_fmt else None
+    if height:
+        ydl_format = (
+            f"{format_id}+bestaudio/best/"
+            f"bestvideo[height<={height}]+bestaudio/best/best"
+        )
+    else:
+        ydl_format = f"{format_id}+bestaudio/best/best"
 
     active_downloads[chat_id] = True
     download_cancel[chat_id] = False
