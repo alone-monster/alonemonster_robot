@@ -71,12 +71,28 @@ def download_file(file_node: dict, dest_dir: str | Path) -> Path:
     dest_dir.mkdir(parents=True, exist_ok=True)
     mega = _get_mega()
 
-    # mega.download() places the file in dest_dir and returns its path
-    downloaded = mega.download(file_node, dest_path=str(dest_dir))
-    if downloaded is None:
-        # Fallback: use the link-based approach
-        link = mega.get_link(file_node)
-        downloaded = mega.download_url(link, dest_path=str(dest_dir))
+    # mega.download() needs a (handle, file_dict) tuple — the raw upload
+    # response dict must first be resolved via mega.find(handle=...).
+    handle = None
+    if isinstance(file_node, dict):
+        for key, val in file_node.items():
+            if isinstance(val, dict) and "h" in val:
+                handle = val["h"]
+                break
+            if isinstance(val, list) and val and isinstance(val[0], dict) and "h" in val[0]:
+                handle = val[0]["h"]
+                break
+        if handle is None and "h" in file_node:
+            handle = file_node["h"]
+
+    if handle is None:
+        raise RuntimeError(f"Could not determine MEGA handle from node: {file_node}")
+
+    resolved = mega.find(handle=handle)
+    if resolved is None:
+        raise RuntimeError(f"MEGA file with handle {handle} not found (upload may not have propagated yet)")
+
+    downloaded = mega.download(resolved, dest_path=str(dest_dir))
 
     downloaded_path = Path(downloaded) if downloaded else None
     if downloaded_path and downloaded_path.exists():
@@ -84,7 +100,6 @@ def download_file(file_node: dict, dest_dir: str | Path) -> Path:
         return downloaded_path
 
     raise RuntimeError(f"MEGA download failed for node {file_node}")
-
 
 def delete_file(file_node: dict) -> None:
     """Delete a file from MEGA by its node dict."""
