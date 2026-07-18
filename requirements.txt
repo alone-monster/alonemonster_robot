@@ -1,8 +1,5 @@
 pyTelegramBotAPI>=4.14.0
-yt-dlp[default]>=2026.3.1
-mega.py>=1.0.8
+yt-dlp[default]
 python-dateutil>=2.8.2
-psutil>=5.9.0
 fastapi>=0.110.0
 uvicorn>=0.27.0
-ffmpeg-python>=0.2.0
