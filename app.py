@@ -20,8 +20,17 @@ Deployment notes (Render):
         python-dateutil>=2.8.2
         fastapi>=0.110.0
         uvicorn>=0.27.0
-        bgutil-ytdlp-pot-provider   # PO token provider — fixes "missing_pot" 403s
   - packages.txt: ffmpeg   (already pre-installed on Render, kept for safety)
+  - NOTE on PO tokens: cookies.txt makes yt-dlp SKIP the "ios"/"android"
+    clients ("does not support cookies"), leaving only "tv"/"web" — and
+    those increasingly require a PO token. This app now tries WITHOUT
+    cookies first (ios/android/tv, no PO token needed) and only falls
+    back to cookies for videos that actually need login. If you still
+    see "missing_pot" 403s on the fallback path, you'd need to run the
+    bgutil-ytdlp-pot-provider's Node/Deno SERVER (not just `pip install`
+    the package — the pip package alone has no token backend running,
+    which is why the logs showed "Script path doesn't exist"). See:
+    https://github.com/Brainicism/bgutil-ytdlp-pot-provider
   - Build Command:
         pip install -r requirements.txt && mkdir -p $HOME/nodejs && \
         curl -fsSL https://nodejs.org/dist/v20.18.1/node-v20.18.1-linux-x64.tar.xz \
@@ -91,22 +100,31 @@ _last_edit_time = {}   # chat_id -> float (throttle progress edits)
 # --------------------------------------------------------------------------
 
 
-def _base_ydl_opts() -> dict:
-    """Options shared by every yt-dlp call (metadata + downloads)."""
+def _base_ydl_opts(use_cookies: bool = False) -> dict:
+    """
+    Options shared by every yt-dlp call (metadata + downloads).
+
+    IMPORTANT: passing a cookiefile makes yt-dlp SKIP the "ios" and
+    "android" player clients entirely ("does not support cookies") —
+    that's confirmed in the logs. ios/android are exactly the clients
+    that don't need a PO token for videoplayback URLs, so cookies were
+    accidentally forcing every request onto "tv"/"web", which DO need a
+    PO token — and with no PO token provider actually running (see
+    below), those URLs 403 immediately.
+
+    So: try WITHOUT cookies first (ios/android/tv — no PO token needed).
+    Only fall back to cookies (tv/web) for videos that truly need login
+    (age-restricted / private) — see _extract_info_with_fallback and
+    _download_with_fallback.
+    """
+    if use_cookies:
+        player_client = ["tv", "web"]
+    else:
+        player_client = ["ios", "android", "tv"]
+
     opts = {
-        "cookiefile": str(COOKIES_FILE) if COOKIES_FILE.exists() else None,
         "js_runtimes": {"node": {}},
-        "extractor_args": {
-            "youtube": {
-                # tv/ios/android clients don't require a PO token for most
-                # formats; web is kept last as a fallback only. We no longer
-                # force-include "missing_pot" formats — those are formats
-                # YouTube requires a valid PO token for, and without a PO
-                # token provider (see requirements.txt) their signed URLs
-                # 403 immediately, which was the root cause of the crash.
-                "player_client": ["tv", "ios", "android", "web"],
-            }
-        },
+        "extractor_args": {"youtube": {"player_client": player_client}},
         "retries": 10,
         "fragment_retries": 10,
         "socket_timeout": 30,
@@ -114,7 +132,35 @@ def _base_ydl_opts() -> dict:
         "no_warnings": False,
         "verbose": True,
     }
-    return {k: v for k, v in opts.items() if v is not None}
+    if use_cookies and COOKIES_FILE.exists():
+        opts["cookiefile"] = str(COOKIES_FILE)
+    return opts
+
+
+def _extract_info_with_fallback(url: str) -> dict:
+    """Metadata fetch: try cookie-less (ios/android/tv) first, then cookies."""
+    try:
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), "skip_download": True}) as ydl:
+            return ydl.extract_info(url, download=False)
+    except Exception as first_err:
+        if not COOKIES_FILE.exists():
+            raise
+        logger.warning("Cookie-less metadata fetch failed (%s), retrying with cookies", first_err)
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), "skip_download": True}) as ydl:
+            return ydl.extract_info(url, download=False)
+
+
+def _download_with_fallback(url: str, opts_overrides: dict):
+    """Download: try cookie-less (ios/android/tv) first, then cookies."""
+    try:
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), **opts_overrides}) as ydl:
+            ydl.download([url])
+    except Exception as first_err:
+        if not COOKIES_FILE.exists() or "Cancelled" in str(first_err):
+            raise
+        logger.warning("Cookie-less download failed (%s), retrying with cookies", first_err)
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), **opts_overrides}) as ydl:
+            ydl.download([url])
 
 
 # --------------------------------------------------------------------------
@@ -223,8 +269,7 @@ def handle_youtube_link(message):
     url = url_match.group(1)
 
     try:
-        with yt_dlp.YoutubeDL({**_base_ydl_opts(), "skip_download": True}) as ydl:
-            info = ydl.extract_info(url, download=False)
+        info = _extract_info_with_fallback(url)
     except Exception as e:
         bot.edit_message_text(f"⚠️ Metadata fetch failed: {e}", message.chat.id, fetch.message_id)
         return
@@ -434,7 +479,6 @@ def _download_and_send(chat_id, message_id, url, base_caption, ydl_format, title
     full_outtmpl = str(WORK_DIR / f"{session_prefix}_full.%(ext)s")
 
     opts = {
-        **_base_ydl_opts(),
         "format": ydl_format,
         "outtmpl": full_outtmpl,
         "progress_hooks": [_make_progress_hook(chat_id, message_id, base_caption)],
@@ -443,8 +487,7 @@ def _download_and_send(chat_id, message_id, url, base_caption, ydl_format, title
         opts["merge_output_format"] = "mp4"
 
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([url])
+        _download_with_fallback(url, opts)
     except Exception as e:
         if "Cancelled" not in str(e):
             bot.send_message(chat_id, f"⚠️ Download failed: {e}")
