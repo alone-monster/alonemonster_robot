@@ -129,7 +129,10 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
     opts = {
         "js_runtimes": {"node": {}},
         "extractor_args": {
-            "youtube": {"player_client": player_client},
+            "youtube": {
+                "player_client": player_client,
+                "formats": ["missing_pot"],
+            },
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
         "retries": 10,
