@@ -142,6 +142,7 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
             },
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
+        "impersonate": "chrome",  # curl_cffi: mimic real Chrome TLS/HTTP fingerprint
         "retries": 10,
         "fragment_retries": 10,
         "socket_timeout": 30,
