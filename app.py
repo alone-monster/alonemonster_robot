@@ -71,6 +71,13 @@ BOT_TOKEN = os.environ["BOT_TOKEN"]
 #   POT_PROVIDER_URL = https://pot-provider-j0ju.onrender.com
 POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "http://127.0.0.1:4416")
 
+# Optional: route yt-dlp's actual video/audio fetch through a proxy — e.g. a
+# local Tor SOCKS5 proxy, so googlevideo.com sees the proxy's exit IP instead
+# of Render's (blocked) datacenter IP.
+# Example: PROXY_URL = socks5h://127.0.0.1:9050
+# Leave unset to disable (no proxy used).
+PROXY_URL = os.environ.get("PROXY_URL", "").strip() or None
+
 BASE_DIR = Path(__file__).resolve().parent
 COOKIES_FILE = BASE_DIR / "cookies.txt"
 WORK_DIR = Path("/tmp/ytdl_work")
@@ -142,6 +149,8 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
         "no_warnings": False,
         "verbose": True,
     }
+    if PROXY_URL:
+        opts["proxy"] = PROXY_URL
     if use_cookies and COOKIES_FILE.exists():
         opts["cookiefile"] = str(COOKIES_FILE)
     return opts
