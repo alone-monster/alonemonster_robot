@@ -142,7 +142,6 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
             },
             "youtubepot-bgutilhttp": {"base_url": [POT_PROVIDER_URL]},
         },
-        "impersonate": "chrome",  # curl_cffi: mimic real Chrome TLS/HTTP fingerprint
         "retries": 10,
         "fragment_retries": 10,
         "socket_timeout": 30,
@@ -151,7 +150,12 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
         "verbose": True,
     }
     if PROXY_URL:
+        # curl_cffi's SOCKS proxy support is broken in prebuilt wheels — combining
+        # it with 'impersonate' causes an immediate, message-less failure. Since a
+        # proxy is active, skip impersonate and rely on the proxy + PO token instead.
         opts["proxy"] = PROXY_URL
+    else:
+        opts["impersonate"] = "chrome"  # curl_cffi: mimic real Chrome TLS/HTTP fingerprint
     if use_cookies and COOKIES_FILE.exists():
         opts["cookiefile"] = str(COOKIES_FILE)
     return opts
