@@ -78,6 +78,13 @@ POT_PROVIDER_URL = os.environ.get("POT_PROVIDER_URL", "http://127.0.0.1:4416")
 # Leave unset to disable (no proxy used).
 PROXY_URL = os.environ.get("PROXY_URL", "").strip() or None
 
+# Test mode: when true, NEVER attach cookies — always use the cookie-less
+# path (ios/android/tv clients, no account session). Useful for testing
+# whether "logged-in cookies suddenly arriving via a Tor exit IP" is what's
+# triggering YouTube's block, independent of any real video's login
+# requirement. Set FORCE_NO_COOKIES=true in Render env vars to enable.
+FORCE_NO_COOKIES = os.environ.get("FORCE_NO_COOKIES", "").strip().lower() in ("1", "true", "yes")
+
 BASE_DIR = Path(__file__).resolve().parent
 COOKIES_FILE = BASE_DIR / "cookies.txt"
 WORK_DIR = Path("/tmp/ytdl_work")
@@ -163,6 +170,10 @@ def _base_ydl_opts(use_cookies: bool = True) -> dict:
 
 def _extract_info_with_fallback(url: str) -> dict:
     """Metadata fetch: cookies first (avoids Render-IP bot-check), then cookie-less."""
+    if FORCE_NO_COOKIES:
+        logger.info("FORCE_NO_COOKIES active — skipping cookie-based attempt entirely")
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), "skip_download": True}) as ydl:
+            return ydl.extract_info(url, download=False)
     try:
         with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), "skip_download": True}) as ydl:
             return ydl.extract_info(url, download=False)
@@ -186,6 +197,11 @@ def _download_with_fallback(url: str, opts_overrides: dict):
     "Sign in to confirm you're not a bot" / LOGIN_REQUIRED. In that case we
     surface the real error immediately instead of masking it.
     """
+    if FORCE_NO_COOKIES:
+        logger.info("FORCE_NO_COOKIES active — skipping cookie-based attempt entirely")
+        with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=False), **opts_overrides}) as ydl:
+            ydl.download([url])
+        return
     try:
         with yt_dlp.YoutubeDL({**_base_ydl_opts(use_cookies=True), **opts_overrides}) as ydl:
             ydl.download([url])
