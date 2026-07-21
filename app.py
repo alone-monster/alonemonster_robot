@@ -61,7 +61,8 @@ def send_welcome(message):
         start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
         downloader_key = types.KeyboardButton("Video Downloader")
         start_keyboard.add(downloader_key)
-        bot.reply_to(message,f"@{name}\n {srt}", parse_mode="markdown", reply_markup=inline_start_button and start_keyboard)
+        inline_start_button.add(start_keyboard)
+        bot.reply_to(message,f"@{name}\n {srt}", parse_mode="markdown", reply_markup=inline_start_button)
         
 inline_menu_button = types.InlineKeyboardMarkup()
 inline_menu_button.add(start_btn, help_btn, more_btn)
