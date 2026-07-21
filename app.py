@@ -383,4 +383,7 @@ def download(message):
 
 
 
-bot.infinity_polling()
+if __name__ == "__main__":
+    bot.remove_webhook()
+    bot.infinity_polling(skip_pending=True)
+    
