@@ -65,7 +65,7 @@ def send_welcome(message):
         start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
         downloader_key = types.KeyboardButton("Video Downloader📲")
         menu_key = types.KeyboardButton("Command Menu📄")
-        start_keyboard.add(downloader_key)
+        start_keyboard.add(menu_key,downloader_key)
         welcome_text = f"[{name}](tg://user?id={id}),\n {srt}"
         bot.reply_to(message,welcome_text, parse_mode="markdown", reply_markup=inline_start_button)
         bot.send_message(
