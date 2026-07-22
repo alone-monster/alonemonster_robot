@@ -65,7 +65,8 @@ def send_welcome(message):
         start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
         downloader_key = types.KeyboardButton("Video Downloader")
         start_keyboard.add(downloader_key)
-        bot.reply_to(message,f"<a href='tg://user?id={id}'>{name}</a>,\n {srt}", parse_mode="markdown", reply_markup=inline_start_button)
+        welcome_text = f"[{name}](tg://user?id={id}),\n {srt}"
+        bot.reply_to(message,welcome_text, parse_mode="markdown", reply_markup=inline_start_button)
         bot.send_message(
         chat_id = message.chat.id,
         text = 'Choose keyboard Options If you need👇',
@@ -103,11 +104,13 @@ inline_help_button= types.InlineKeyboardMarkup()
 inline_help_button.add(start_btn, menu_btn, more_btn)
 @bot.callback_query_handler(func=lambda call: call.data =='helpbtn')
 def help_callback(call):
-     name=call.from_user.username
+     name=call.from_user.first_name
+     id = call.from_user.id
      bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        text=f'👋 *Hello* @{name},{help}',
+        text=f'👋 *Hello* [{name}](tg://user?id={id})
+        ,{help}',
         parse_mode="Markdown",
         reply_markup=inline_help_button
      )
