@@ -386,7 +386,7 @@ def command_menu(message):
     quick_more_button=types.InlineKeyboardButton(text='More', callback_data='morebutton')
     inline_quick_more=types.InlineKeyboardMarkup()
     inline_quick_more.add(quick_more_button)
-    bot.reply_to(message,f"<a href=' tg://user?id={id}'>{name}</a>, <b>Menu</b> List is below:\n\n{menu2} {more2}", parse_mode = 'HTML')
+    bot.reply_to(message,f"<a href=' tg://user?id={id}'>{name}</a>, <b>Menu</b> List is below:\n\n{menu2} {more2}", parse_mode = 'HTML', reply_markup = types.ReplyKeyboardRemove())
 
 
 
