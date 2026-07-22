@@ -69,7 +69,7 @@ def send_welcome(message):
         bot.reply_to(message,welcome_text, parse_mode="markdown", reply_markup=inline_start_button)
         bot.send_message(
         chat_id = message.chat.id,
-        text = '<i>Tap keyboard option If you need👇<i>',
+        text = '<i>Tap keyboard option If you need👇</i>',
         parse_mode = "HTML",
         reply_markup = start_keyboard
          )
