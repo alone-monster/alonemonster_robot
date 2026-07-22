@@ -60,14 +60,15 @@ inline_start_button.add(menu_btn, help_btn, more_btn)
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
         
-        name=message.from_user.username.replace('_','\\_')
+        name=message.from_user.first_name
+        id = message.from_user.id
         start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
         downloader_key = types.KeyboardButton("Video Downloader")
         start_keyboard.add(downloader_key)
-        bot.reply_to(message,f"@{name}\n {srt}", parse_mode="markdown", reply_markup=inline_start_button)
+        bot.reply_to(message,f"<a href='tg://user?id={id}'>{name}</a>,\n {srt}", parse_mode="markdown", reply_markup=inline_start_button)
         bot.send_message(
-        message,
-        'Choose keyboard Options If you need👇',
+        chat_id = message.chat.id,
+        text = 'Choose keyboard Options If you need👇',
         parse_mode = "HTML",
         reply_markup = start_keyboard
          )
