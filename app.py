@@ -63,7 +63,8 @@ def send_welcome(message):
         name=message.from_user.first_name
         id = message.from_user.id
         start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        downloader_key = types.KeyboardButton("Video Downloader")
+        downloader_key = types.KeyboardButton("Video Downloader📲")
+        menu_key = types.KeyboardButton("Command Menu📄")
         start_keyboard.add(downloader_key)
         welcome_text = f"[{name}](tg://user?id={id}),\n {srt}"
         bot.reply_to(message,welcome_text, parse_mode="markdown", reply_markup=inline_start_button)
@@ -285,10 +286,11 @@ def menu_text(message):
     quick_more_button=types.InlineKeyboardButton(text='More', callback_data='morebutton')
     inline_quick_more=types.InlineKeyboardMarkup()
     inline_quick_more.add(quick_more_button)
-    username=message.from_user.username
+    name=message.from_user.first_name
+    id= message.from_user.id
     bot.reply_to(
        message,
-       f"@{username}, <b>Menu</b> List is below:\n\n{menu2} {more2}",
+       f"[{name}](tg://user?id={}), <b>Menu</b> List is below:\n\n{menu2} {more2}",
        parse_mode='HTML',
        reply_markup=inline_quick_more
     )
@@ -370,10 +372,21 @@ def youtube_search(inline_data):
         else:
             raise e
 
-@bot.message_handler(func=lambda message: message.text is not None and message.text=="Video Downloader")
+@bot.message_handler(func=lambda message: message.text is not None and message.text=="Video Downloader📲")
 def download(message):
     bot.reply_to(message, "This feature is currently not available !!",
     reply_markup=types.ReplyKeyboardRemove())
+    
+
+@bot.message_handler(func= lambda message: message.text is not None and message.text == "Command Menu📄")
+def command_menu(message):
+    
+    name=message.from_user.first_name
+    id = message.from_user.id
+    quick_more_button=types.InlineKeyboardButton(text='More', callback_data='morebutton')
+    inline_quick_more=types.InlineKeyboardMarkup()
+    inline_quick_more.add(quick_more_button)
+    bot.reply_to(message,f"[{name}](tg://user?id={}), <b>Menu</b> List is below:\n\n{menu2} {more2}", parse_mode = 'HTML')
 
 
 
