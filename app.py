@@ -63,21 +63,18 @@ def send_welcome(message):
         name=message.from_user.username.replace('_','\\_')
         bot.reply_to(message,f"@{name}\n {srt}", parse_mode="markdown", reply_markup=inline_start_button)
         
-inline_menu_button = types.InlineKeyboardMarkup()
-inline_menu_button.add(start_btn, help_btn, more_btn)
-
-def start_keyboard_reply(message):
+        inline_menu_button = types.InlineKeyboardMarkup()
+        inline_menu_button.add(start_btn, help_btn, more_btn)
+        start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        downloader_key = types.KeyboardButton("Video Downloader")
+        start_keyboard.add(downloader_key)
     
-    start_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    downloader_key = types.KeyboardButton("Video Downloader")
-    start_keyboard.add(downloader_key)
-    
-    bot.send_message(
-       message,
-       'Choose keyboard Options If you need👇',
-       parse_mode = "HTML",
-       reply_markup = start_keyboard
-       )
+        bot.send_message(
+        message,
+        'Choose keyboard Options If you need👇',
+        parse_mode = "HTML",
+        reply_markup = start_keyboard
+         )
     
 @bot.callback_query_handler(func=lambda call: call.data == 'menubtn')
 def menu_callback(call):
@@ -290,7 +287,7 @@ def menu_text(message):
 
 more_des=r'''<b>🔹Our Extra Text Command:</b>
 
-•<code>Feedback</code> - <i>Send your Feedback to admin about the user experience of Bot and Website.</i>
+•<code><u>Feedback</u></code> - <i>Send your Feedback to admin about the user experience of Bot and Website.</i>
 '''
 feedback_button=types.InlineKeyboardButton(text='Feedback', callback_data='feedbackbutton')
 @bot.message_handler(commands=["more"])
