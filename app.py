@@ -109,8 +109,7 @@ def help_callback(call):
      bot.edit_message_text(
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
-        text=f'👋 *Hello* [{name}](tg://user?id={id})
-        ,{help}',
+        text=f'👋 *Hello* [{name}](tg://user?id={id}),{help}',
         parse_mode="Markdown",
         reply_markup=inline_help_button
      )
