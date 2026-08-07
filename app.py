@@ -8,6 +8,7 @@ from telebot.types import BotCommand
 from telebot.types import InlineQueryResultArticle, InputTextMessageContent 
 from youtube_search import YoutubeSearch
 user_states={}
+user_files ={}
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 bot=telebot.TeleBot(BOT_TOKEN)
@@ -71,11 +72,11 @@ def send_welcome(message):
         args = message.text.split()
         if len(args) > 1:
           para_meter = args[1]
-          if para_meter == "1234":
+          if para_meter == "flashtool":
             user_id = message.from_user.id
             member = bot.get_chat_member(chat_id=CHANNEL_ID,user_id=user_id)
             if member.status in ['member', 'administrator', 'creator']:
-                    bot.send_document(message.chat.id, "BQACAgUAAxkBAANManYJa5NBZH7JPZ78okzIROHZRUMAAi0fAAKbk2hV7ZCJGDxa4zY9BA")
+                    bot.send_document(message.chat.id, "BQACAgUAAxkBAAILfmp2HLSCG_9eqVc12q0uU_cFYnPjAAItHwACm5NoVdT-zi9Y5FiRPQQ")
             else:
                     markup = InlineKeyboardMarkup()
                     markup.add(InlineKeyboardButton("Join Our Channel", url="https://t.me/AloneMonsterCoding"))
@@ -419,7 +420,7 @@ def check_sub(call):
     user_id = call.from_user.id
     member = bot.get_chat_member(chat_id=CHANNEL_ID,user_id=user_id)
     if member.status in ['member', 'administrator', 'creator']:
-      bot.send_document(call.message.chat.id,"BQACAgUAAxkBAANManYJa5NBZH7JPZ78okzIROHZRUMAAi0fAAKbk2hV7ZCJGDxa4zY9BA")
+      bot.send_document(call.message.chat.id,"BQACAgUAAxkBAAILfmp2HLSCG_9eqVc12q0uU_cFYnPjAAItHwACm5NoVdT-zi9Y5FiRPQQ")
     
     else:
       bot.answer_callback_query( callback_query_id =call.id, text = 'It looks like you have not subscribed the Telegram channel. Please subscribe first, then try again.', show_alert = True)
