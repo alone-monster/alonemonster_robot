@@ -67,13 +67,30 @@ def send_welcome(message):
         menu_key = types.KeyboardButton("Command Menu📄")
         start_keyboard.add(menu_key,downloader_key)
         welcome_text = f"[{name}](tg://user?id={id}),\n {srt}"
-        bot.reply_to(message,welcome_text, parse_mode="markdown", reply_markup=inline_start_button)
-        bot.send_message(
-        chat_id = message.chat.id,
-        text = '<i>Tap keyboard option If you need👇</i>',
-        parse_mode = "HTML",
-        reply_markup = start_keyboard
-         )
+        
+        args = message.text.split()
+        if len(args) > 1:
+          para_meter = args[1]
+          if para_meter == "1234":
+            user_id = message.from_user.id
+            member = bot.get_chat_member(chat_id=CHANNEL_ID,user_id=user_id)
+            if member.status in ['member', 'administrator', 'creator']:
+                    bot.send_document(message.chat.id, "BQACAgUAAxkBAANManYJa5NBZH7JPZ78okzIROHZRUMAAi0fAAKbk2hV7ZCJGDxa4zY9BA")
+            else:
+                    markup = InlineKeyboardMarkup()
+                    markup.add(InlineKeyboardButton("Join Our Channel", url="https://t.me/AloneMonsterCoding"))
+                    markup.add(InlineKeyboardButton("Try Again", callback_data="check_subscription"))
+                    bot.send_message(message.chat.id, "Please Subscribe Our Channel first, Then Try Again", reply_markup=markup)
+
+
+        if len(args) == 1:
+         bot.reply_to(message,welcome_text, parse_mode="markdown", reply_markup=inline_start_button)
+         bot.send_message(
+          chat_id = message.chat.id,
+          text = '<i>Tap keyboard option If you need👇</i>',
+          parse_mode = "HTML",
+          reply_markup = start_keyboard
+           )
          
 
 
@@ -386,10 +403,110 @@ def command_menu(message):
     quick_more_button=types.InlineKeyboardButton(text='More', callback_data='morebutton')
     inline_quick_more=types.InlineKeyboardMarkup()
     inline_quick_more.add(quick_more_button)
+    
+    
+    menu_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    feedback_key = types.KeyboardButton('Feedback')
+    menu_keyboard.add(feedback_key)
     bot.reply_to(message,f"<a href=' tg://user?id={id}'>{name}</a>, <b>Menu</b> List is below:\n\n{menu2} {more2}", parse_mode = 'HTML', reply_markup = types.ReplyKeyboardRemove())
 
 
+@bot.callback_query_handler(func=lambda call: call.data == 'check_subscription')
+def check_sub(call):
+    
+ 
+                    
+    user_id = call.from_user.id
+    member = bot.get_chat_member(chat_id=CHANNEL_ID,user_id=user_id)
+    if member.status in ['member', 'administrator', 'creator']:
+      bot.send_document(call.message.chat.id,"BQACAgUAAxkBAANManYJa5NBZH7JPZ78okzIROHZRUMAAi0fAAKbk2hV7ZCJGDxa4zY9BA")
+    
+    else:
+      bot.answer_callback_query( callback_query_id =call.id, text = 'It looks like you have not subscribed the Telegram channel. Please subscribe first, then try again.', show_alert = True)
 
+
+
+@bot.message_handler(func=lambda message: message.from_user.id == 5363583219)
+def admin_menu(message):
+    
+    inline_admin = types.InlineKeyboardMarkup()
+    ufile = types.InlineKeyboardButton(text = 'Upload File', callback_data = 'ufilebtn')
+    inline_admin.add(ufile)
+    bot.send_message(
+       chat_id = message.chat.id,
+       text = 'Welcome Admin, Choose the feature that you want to use below:',
+       reply_markup = inline_admin
+       )
+
+@bot.callback_query_handler(lambda call: call.data == 'ufilebtn')
+def ufile_text(call):
+    bot.edit_message_text(
+     chat_id = call.message.chat.id,
+     message_id = call.message.message_id,
+     text = 'Send your File or Text Here',
+     )
+     
+    user_states[call.message.chat.id] = 'waiting_for_files'
+
+@bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'waiting_for_files', content_types = ['text', 'video', 'photo', 'audio', 'voice', 'sticker', 'video_note', 'document'])
+def upload_file(message):
+  if message.content_type == "text":
+    content = message.text
+  elif message.content_type == "photo":
+    content = message.photo[-1].file_id
+  elif message.content_type == "document":
+    content = message.document.file_id
+  elif message.content_type == "video":
+    content = message.video.file_id
+  elif message.content_type == "audio":
+    content = message.audio.file_id
+  elif message.content_type == "voice":
+    content = message.voice.file_id
+  elif message.content_type == "sticker":
+    content = message.sticker.file_id
+  elif message.content_type == "video_note":
+    content = message.video_note.file_id
+  else:
+    content = None
+
+
+  inline_fp = types.InlineKeyboardMarkup()
+  fp_button = types.InlineKeyboardButton(text = 'Preview File', callback_data = 'fpbtn')
+  inline_fp.add(fp_button)
+  bot.send_message(
+   chat_id = message.chat.id,
+   text = f'<blockquote>{content}</blockquote>',
+   parse_mode = 'HTML',
+   reply_markup = inline_fp
+   )
+    
+  user_files[message.chat.id] = {'file_id': content, 'type': message.content_type}
+
+
+  user_states.pop(message.chat.id, None)
+  return
+    
+@bot.callback_query_handler(lambda call: call.data == 'fpbtn')
+def send_fp(call):
+    file_id = user_files.get(call.message.chat.id, {}).get('file_id')
+    file_type = user_files.get(call.message.chat.id, {}).get('type')
+
+    chat_id = call.message.chat.id
+    if file_type == 'photo':
+      bot.send_photo(chat_id, file_id)
+    elif file_type == 'video':
+      bot.send_video(chat_id, file_id)
+    elif file_type == 'audio':
+      bot.send_audio(chat_id, file_id)
+    elif file_type == 'voice':
+      bot.send_voice(chat_id, file_id)
+    elif file_type == 'sticker':
+      bot.send_sticker(chat_id, file_id)
+    elif file_type == 'document':
+      bot.send_document(chat_id, file_id)
+    
+    user_files.pop(call.message.chat.id, None)
+    return
 
 
 
