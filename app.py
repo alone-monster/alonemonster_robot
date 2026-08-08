@@ -13,6 +13,8 @@ user_files ={}
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 bot=telebot.TeleBot(BOT_TOKEN)
 
+CHANNEL_ID = -1003984958362
+
 srt=r'''⭐ *Welcome to* 𝐀𝐋𝐎𝐍𝐄 𝐌𝐎𝐍𝐒𝐓𝐄𝐑 𝐂𝐎𝐃𝐈𝐍𝐆 🙇
 
 Here, you can request help or ask any questions about programming.
