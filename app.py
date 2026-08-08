@@ -82,8 +82,8 @@ def send_welcome(message):
                     caption = 'Termux:API App')
             else:
                     markup = types.InlineKeyboardMarkup()
-                    markup.add(InlineKeyboardButton("Join Our Channel", url="https://t.me/AloneMonsterCoding"))
-                    markup.add(InlineKeyboardButton("Try Again", callback_data="check_subscription"))
+                    markup.add(types.InlineKeyboardButton("Join Our Channel", url="https://t.me/AloneMonsterCoding"))
+                    markup.add(types.InlineKeyboardButton("Try Again", callback_data="check_subscription"))
                     bot.send_message(message.chat.id, "Please Subscribe Our Channel first, Then Try Again", reply_markup=markup)
 
 
