@@ -425,6 +425,10 @@ def check_sub(call):
     if member.status in ['member', 'administrator', 'creator']:
       bot.send_document(chat_id = call.message.chat.id, document = "BQACAgUAAxkBAANManYJa5NBZH7JPZ78okzIROHZRUMAAi0fAAKbk2hV7ZCJGDxa4zY9BA",
                     caption = 'Termux:API App')
+      bot.edit_message_text(
+      chat_id = call.message.chat.id,
+      message_id = call.message.message_id,
+      text = "You've joined our channel ✅")
     
     else:
       bot.answer_callback_query( callback_query_id =call.id, text = 'It looks like you have not subscribed the Telegram channel. Please subscribe first, then try again.', show_alert = True)
