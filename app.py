@@ -72,7 +72,7 @@ def send_welcome(message):
         args = message.text.split()
         if len(args) > 1:
           para_meter = args[1]
-          if para_meter == "flashtool":
+          if para_meter == "unlocktool":
             user_id = message.from_user.id
             member = bot.get_chat_member(chat_id=CHANNEL_ID,user_id=user_id)
             if member.status in ['member', 'administrator', 'creator']:
